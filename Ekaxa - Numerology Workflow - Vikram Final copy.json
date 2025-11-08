@@ -1,0 +1,1037 @@
+{
+  "name": "Ekaxa - Numerology Workflow - Vikram Final copy",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "// Numerology Calculation Function\n// Extract form data\nconst firstName = $input.item.json['First Name'].toUpperCase().trim();\nconst middleName = $input.item.json['Middle Name'].toUpperCase().trim();\nconst lastName = $input.item.json['Last Name'].toUpperCase().trim();\nconst dobString = $input.item.json['Date of Birth'];\nconst timeOfBirth = $input.item.json['Time of Birth'];\nconst gender = $input.item.json['Gender'];\nconst email = $input.item.json['Email Address'];\nconst phone = $input.item.json['Phone Number'];\n\n// Parse Date of Birth\nconst dob = new Date(dobString);\nconst day = dob.getDate();\nconst month = dob.getMonth() + 1;\nconst year = dob.getFullYear();\n\n// Chaldean Numerology Mapping\nconst chaldeanMap = {\n  'A': 1, 'I': 1, 'J': 1, 'Q': 1, 'Y': 1,\n  'B': 2, 'K': 2, 'R': 2,\n  'C': 3, 'G': 3, 'L': 3, 'S': 3,\n  'D': 4, 'M': 4, 'T': 4,\n  'E': 5, 'H': 5, 'N': 5, 'X': 5,\n  'U': 6, 'V': 6, 'W': 6,\n  'O': 7, 'Z': 7,\n  'F': 8, 'P': 8\n};\n\n// Calculate Chaldean Number\nfunction calculateChaldean(text) {\n  let total = 0;\n  for (let char of text.toUpperCase()) {\n    if (chaldeanMap[char]) {\n      total += chaldeanMap[char];\n    }\n  }\n  return total;\n}\n\n// Calculate Single Digit (except 11 and 22)\nfunction calculateSingleDigit(num) {\n  if (num === 11 || num === 22) return num;\n  while (num > 9) {\n    num = String(num).split('').reduce((a, b) => parseInt(a) + parseInt(b), 0);\n  }\n  return num === 0 ? 9 : num;\n}\n\n// Calculate Driver Number\nfunction calculateDriver(dayNum) {\n  const digits = String(dayNum).split('').map(Number);\n  let sum = digits.reduce((a, b) => a + b, 0);\n  return sum % 9 === 0 ? 9 : sum % 9;\n}\n\n// Calculate Conductor Number\nfunction calculateConductor(d, m, y) {\n  const allDigits = String(d) + String(m) + String(y);\n  let sum = allDigits.split('').map(Number).reduce((a, b) => a + b, 0);\n  return sum % 9 === 0 ? 9 : sum % 9;\n}\n\n// Calculate Kua Number\nfunction calculateKua(y, genderStr) {\n  const yearSum = y % 9;\n  let kua;\n  if (genderStr === 'Male') {\n    kua = (11 - yearSum) % 9;\n  } else {\n    kua = (4 + yearSum) % 9;\n  }\n  return kua === 0 ? 9 : kua;\n}\n\n// Parse Time of Birth to check for special driver logic\nfunction parseTimeOfBirth(timeStr) {\n  // Parse time like \"10:30 AM\" or \"11:45 PM\"\n  const timeParts = timeStr.match(/(\\d{1,2}):(\\d{2})\\s*(AM|PM)/i);\n  if (!timeParts) return { hours: 12, minutes: 0 };\n  \n  let hours = parseInt(timeParts[1]);\n  const minutes = parseInt(timeParts[2]);\n  const period = timeParts[3].toUpperCase();\n  \n  // Convert to 24-hour format\n  if (period === 'PM' && hours !== 12) hours += 12;\n  if (period === 'AM' && hours === 12) hours = 0;\n  \n  return { hours, minutes };\n}\n\n// Calculate Driver Numbers with Time Logic\nconst time = parseTimeOfBirth(timeOfBirth);\nconst currentDriver = calculateDriver(day);\nlet driverNumbers = [currentDriver];\nlet driverNote = '';\n\n// Before 1 AM logic\nif (time.hours === 0 && time.minutes < 60) {\n  const prevDay = day - 1 > 0 ? day - 1 : 1;\n  const prevDriver = calculateDriver(prevDay);\n  driverNumbers = [prevDriver, currentDriver];\n  driverNote = `Born before 1 AM - qualities of both ${prevDriver} and ${currentDriver}`;\n}\n// After 11 PM logic\nelse if (time.hours === 23) {\n  const nextDay = day + 1;\n  const nextDriver = calculateDriver(nextDay);\n  driverNumbers = [currentDriver, nextDriver];\n  driverNote = `Born after 11 PM - qualities of both ${currentDriver} and ${nextDriver}`;\n}\nelse {\n  driverNote = `Standard driver number: ${currentDriver}`;\n}\n\n// Calculate all numerology numbers\nconst conductor = calculateConductor(day, month, year);\nconst kua = calculateKua(year, gender);\n\n// Calculate Personal Year\nconst currentYear = new Date().getFullYear();\nconst personalYearSum = day + month + currentYear;\nconst personalYear = personalYearSum % 9 === 0 ? 9 : personalYearSum % 9;\n\n// Calculate Personal Month\nconst currentMonth = new Date().getMonth() + 1;\nconst personalMonthSum = currentMonth + personalYear;\nconst personalMonth = personalMonthSum % 9 === 0 ? 9 : personalMonthSum % 9;\n\n// Calculate Success Number\nconst successSum = day + month;\nlet successNumber;\nif (successSum === 11 || successSum === 22) {\n  successNumber = successSum;\n} else {\n  successNumber = successSum % 9 === 0 ? 9 : successSum % 9;\n}\n\n// Calculate Name Numbers\nconst firstCompound = calculateChaldean(firstName);\nconst middleCompound = calculateChaldean(middleName);\nconst lastCompound = calculateChaldean(lastName);\nconst fullNameCompound = firstCompound + middleCompound + lastCompound;\nconst nameNumber = calculateSingleDigit(fullNameCompound);\n\n// Count digits in DOB for LoShu Grid\nconst dateStr = String(day).padStart(2, '0') + String(month).padStart(2, '0') + String(year);\nconst digitCount = {};\nfor (let i = 1; i <= 9; i++) {\n  digitCount[i] = (dateStr.match(new RegExp(i, 'g')) || []).length;\n}\n\n// Generate unique submission ID\nconst submissionId = Date.now().toString(36) + Math.random().toString(36).substr(2);\n\n// Return all calculated data\nreturn {\n  json: {\n    submissionId,\n    timestamp: new Date().toISOString(),\n    \n    // Personal Info\n    firstName,\n    middleName,\n    lastName,\n    fullName: `${firstName} ${middleName} ${lastName}`,\n    dateOfBirth: dobString,\n    day,\n    month,\n    year,\n    timeOfBirth,\n    timeHours: time.hours,\n    timeMinutes: time.minutes,\n    gender,\n    email,\n    phone,\n    age: currentYear - year,\n    \n    // Numerology Numbers\n    driverNumbers: driverNumbers.join(', '),\n    driverNote,\n    conductor,\n    kua,\n    personalYear,\n    personalMonth,\n    successNumber,\n    \n    // Name Numbers\n    firstCompound,\n    middleCompound,\n    lastCompound,\n    fullNameCompound,\n    nameNumber,\n    \n    // LoShu Grid\n    loshuGrid: digitCount,\n    \n    // Current Date\n    currentDate: new Date().toISOString().split('T')[0],\n    currentYear,\n    currentMonth,\n    \n    // For file naming\n    fileTimestamp: new Date().toISOString().replace(/[:.]/g, '-').split('T').join('-').substring(0, 19)\n  }\n};"
+      },
+      "name": "Calculate Numerology",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        528,
+        -224
+      ],
+      "id": "edab7170-9c73-4743-8289-7830cc72c936"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1kzxGcvlrzmUF1PDL4sgGGTflX5AeuTbOfWL9hlgoxoA",
+          "mode": "list",
+          "cachedResultName": "Ekaxa - Input Data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1kzxGcvlrzmUF1PDL4sgGGTflX5AeuTbOfWL9hlgoxoA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Input Data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1kzxGcvlrzmUF1PDL4sgGGTflX5AeuTbOfWL9hlgoxoA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Create Timestamp": "={{ $json.timestamp }}",
+            "First Name": "={{ $json.firstName }}",
+            "Middle Name": "={{ $json.middleName }}",
+            "Last Name": "={{ $json.lastName }}",
+            "DOB": "={{ $json.dateOfBirth }}",
+            "TOB": "={{ $json.timeOfBirth }}",
+            "Gender": "={{ $json.gender }}",
+            "Email": "={{ $json.email }}",
+            "Phone": "={{ $json.phone }}"
+          },
+          "matchingColumns": [
+            "Create Timestamp"
+          ],
+          "schema": [
+            {
+              "id": "Create Timestamp",
+              "displayName": "Create Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "First Name",
+              "displayName": "First Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Middle Name",
+              "displayName": "Middle Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Name",
+              "displayName": "Last Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DOB",
+              "displayName": "DOB",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TOB",
+              "displayName": "TOB",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Gender",
+              "displayName": "Gender",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 1",
+              "displayName": "Column 1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 2",
+              "displayName": "Column 2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 3",
+              "displayName": "Column 3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 4",
+              "displayName": "Column 4",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 5",
+              "displayName": "Column 5",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 6",
+              "displayName": "Column 6",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 7",
+              "displayName": "Column 7",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 8",
+              "displayName": "Column 8",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 9",
+              "displayName": "Column 9",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 10",
+              "displayName": "Column 10",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 11",
+              "displayName": "Column 11",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 12",
+              "displayName": "Column 12",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 13",
+              "displayName": "Column 13",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 14",
+              "displayName": "Column 14",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 15",
+              "displayName": "Column 15",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 16",
+              "displayName": "Column 16",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 17",
+              "displayName": "Column 17",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Column 18",
+              "displayName": "Column 18",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submissionId",
+              "displayName": "submissionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "firstName",
+              "displayName": "firstName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "middleName",
+              "displayName": "middleName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lastName",
+              "displayName": "lastName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fullName",
+              "displayName": "fullName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dateOfBirth",
+              "displayName": "dateOfBirth",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day",
+              "displayName": "day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "month",
+              "displayName": "month",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "year",
+              "displayName": "year",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timeOfBirth",
+              "displayName": "timeOfBirth",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timeHours",
+              "displayName": "timeHours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timeMinutes",
+              "displayName": "timeMinutes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gender",
+              "displayName": "gender",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "age",
+              "displayName": "age",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "driverNumbers",
+              "displayName": "driverNumbers",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "driverNote",
+              "displayName": "driverNote",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "conductor",
+              "displayName": "conductor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kua",
+              "displayName": "kua",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "personalYear",
+              "displayName": "personalYear",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "personalMonth",
+              "displayName": "personalMonth",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "successNumber",
+              "displayName": "successNumber",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "firstCompound",
+              "displayName": "firstCompound",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "middleCompound",
+              "displayName": "middleCompound",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lastCompound",
+              "displayName": "lastCompound",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fullNameCompound",
+              "displayName": "fullNameCompound",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nameNumber",
+              "displayName": "nameNumber",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "loshuGrid",
+              "displayName": "loshuGrid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currentDate",
+              "displayName": "currentDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currentYear",
+              "displayName": "currentYear",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currentMonth",
+              "displayName": "currentMonth",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fileTimestamp",
+              "displayName": "fileTimestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Store Submission",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        320,
+        -32
+      ],
+      "id": "048cc696-3796-402c-8e29-47551099db85",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "zZ2LR9g3Dfkuhv7t",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1rUKlwaU0eOa8hkMl8XBwrEnLqMIPiHEtP35wbHX9h90",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2123452444,
+          "mode": "list",
+          "cachedResultName": "DC - Attributes",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rUKlwaU0eOa8hkMl8XBwrEnLqMIPiHEtP35wbHX9h90/edit#gid=2123452444"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Mulank (Driver) or Bhagyank (Conductor)",
+              "lookupValue": "={{ $('Calculate Numerology').item.json.driverNumbers }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Lookup DC Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        528,
+        -32
+      ],
+      "id": "7fccfa7e-aafe-405b-b604-c68ebf11e9f6",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "zZ2LR9g3Dfkuhv7t",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1rUKlwaU0eOa8hkMl8XBwrEnLqMIPiHEtP35wbHX9h90",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2052261277,
+          "mode": "list",
+          "cachedResultName": "DC - Combinations",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rUKlwaU0eOa8hkMl8XBwrEnLqMIPiHEtP35wbHX9h90/edit#gid=2052261277"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Mulank (Driver)",
+              "lookupValue": "={{ $('Calculate Numerology').item.json.driverNumbers }}"
+            },
+            {
+              "lookupColumn": "Bhagyank (Conductor)",
+              "lookupValue": "={{ $('Calculate Numerology').item.json.conductor }}"
+            }
+          ]
+        },
+        "combineFilters": "AND",
+        "options": {}
+      },
+      "name": "Lookup Compound Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        800,
+        -32
+      ],
+      "id": "b3e9a730-c192-43ae-98bb-76b65d6aef8e",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "zZ2LR9g3Dfkuhv7t",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Merge calculation data with lookup data\nconst calculationData = $('Calculate Numerology').item.json;\nconst dcData = $('Lookup DC Data').all();\nconst compoundData = $('Lookup Compound Data').all();\n\n// Create lookup maps\nconst dcMap = {};\ndcData.forEach(row => {\n  if (row.json.No) {\n    dcMap[row.json.No] = {\n      planet: row.json.Planet || '',\n      description: row.json.Description || ''\n    };\n  }\n});\n\nconst compoundMap = {};\ncompoundData.forEach(row => {\n  if (row.json['Compound Number']) {\n    compoundMap[row.json['Compound Number']] = {\n      name: row.json.Name || '',\n      description: row.json.Description || ''\n    };\n  }\n});\n\n// Get driver descriptions\nconst driverNumbersArray = calculationData.driverNumbers.split(', ').map(n => parseInt(n));\nconst driverDescriptions = driverNumbersArray.map(num => {\n  const info = dcMap[num] || {};\n  return `${num} - ${info.planet || 'Unknown'}`;\n}).join(' and ');\n\n// Get conductor description\nconst conductorInfo = dcMap[calculationData.conductor] || {};\nconst conductorDescription = `${calculationData.conductor} - ${conductorInfo.planet || 'Unknown'}`;\n\n// Get kua description\nconst kuaInfo = dcMap[calculationData.kua] || {};\nconst kuaDescription = `${calculationData.kua} - ${kuaInfo.planet || 'Unknown'}`;\n\n// Get name compound descriptions\nconst firstCompoundInfo = compoundMap[calculationData.firstCompound] || {};\nconst middleCompoundInfo = compoundMap[calculationData.middleCompound] || {};\nconst lastCompoundInfo = compoundMap[calculationData.lastCompound] || {};\nconst fullNameCompoundInfo = compoundMap[calculationData.fullNameCompound] || {};\n\nreturn {\n  json: {\n    ...calculationData,\n    driverDescription: driverDescriptions,\n    conductorDescription: conductorDescription,\n    kuaDescription: kuaDescription,\n    firstCompoundName: firstCompoundInfo.name || '',\n    firstCompoundDesc: firstCompoundInfo.description || '',\n    middleCompoundName: middleCompoundInfo.name || '',\n    middleCompoundDesc: middleCompoundInfo.description || '',\n    lastCompoundName: lastCompoundInfo.name || '',\n    lastCompoundDesc: lastCompoundInfo.description || '',\n    fullNameCompoundName: fullNameCompoundInfo.name || '',\n    fullNameCompoundDesc: fullNameCompoundInfo.description || ''\n  }\n};"
+      },
+      "name": "Merge Lookup Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        -32
+      ],
+      "id": "866fb7e3-be4f-42cb-815d-af3ac10f6a12"
+    },
+    {
+      "parameters": {
+        "path": "f1fdad60-e486-4600-8000-c918f800d678",
+        "formTitle": "Numerology Report Request",
+        "formDescription": "Get your personalized numerology report. Fill in all the details below.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "First Name",
+              "placeholder": "Dipak",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Middle Name",
+              "placeholder": "Kumar",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Last Name",
+              "placeholder": "Dutta",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Date of Birth",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Time of Birth",
+              "placeholder": "04:45 AM",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Gender",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Male"
+                  },
+                  {
+                    "option": "Female"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email Address",
+              "fieldType": "email",
+              "placeholder": "dipak@ekaxa.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone Number",
+              "placeholder": "+1-123-456-7890",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        256,
+        -224
+      ],
+      "webhookId": "f1fdad60-e486-4600-8000-c918f800d678",
+      "id": "18c93811-dadf-4c09-86cf-4be99f472ef0"
+    },
+    {
+      "parameters": {
+        "operation": "copy",
+        "fileId": {
+          "__rl": true,
+          "value": "12qHWpAq6YY7jLAze5n-r_Lan8ws0IRSk9bQ-rr0Sns8",
+          "mode": "list",
+          "cachedResultName": "GD-Template_Ekaxa_Report ",
+          "cachedResultUrl": "https://docs.google.com/document/d/12qHWpAq6YY7jLAze5n-r_Lan8ws0IRSk9bQ-rr0Sns8/edit?usp=drivesdk"
+        },
+        "name": "={{ $json.fullName }}-Ekaxa_Report ",
+        "sameFolder": false,
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1-YDUW_7xJh-F2_7XE43nTC6WXmaj6k6M",
+          "mode": "list",
+          "cachedResultName": "07 - Ekaxa - Temp",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1-YDUW_7xJh-F2_7XE43nTC6WXmaj6k6M"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1360,
+        -32
+      ],
+      "id": "040e0da2-0922-4d1f-90cd-5f9e61ea6cab",
+      "name": "Copy file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "58T0LJj6nIZ5hFJj",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": ""
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1568,
+        -32
+      ],
+      "id": "2d165477-8d30-48c6-988f-e0cbd420c775",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        176
+      ],
+      "id": "20c9c2df-8f9b-45de-bd1c-e1c3b3a317f5",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "QypyoqS3p9YwPayM",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1584,
+        176
+      ],
+      "id": "513cc04b-6d0e-4d9e-9623-5d777949e34b",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ $json.id }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('actionFields0_Text', ``, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        176
+      ],
+      "id": "6e8e68ba-e31e-4d40-a76c-0be7d60eb54b",
+      "name": "Update a document in Google Docs",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "nK98k37jhPQ2GOBA",
+          "name": "Google Docs account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Calculate Numerology": {
+      "main": [
+        [
+          {
+            "node": "Store Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Submission": {
+      "main": [
+        [
+          {
+            "node": "Lookup DC Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup DC Data": {
+      "main": [
+        [
+          {
+            "node": "Lookup Compound Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Compound Data": {
+      "main": [
+        [
+          {
+            "node": "Merge Lookup Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Lookup Data": {
+      "main": [
+        [
+          {
+            "node": "Copy file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form": {
+      "main": [
+        [
+          {
+            "node": "Calculate Numerology",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copy file": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a document in Google Docs": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ea44c156-071c-4528-928e-504dfe47b70b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "96038b338d69932bfb556f7850ab8e7d60650d111ebe4cea432e48c4c309cd9d"
+  },
+  "id": "w3qt2HXgskKNE0ww",
+  "tags": []
+}
